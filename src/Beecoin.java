@@ -7,45 +7,58 @@ public class Beecoin {
 	private static ArrayList<Block> blockchain = new ArrayList<>(); // The blockchain is implemented as an arraylist of
 																	// Blocks
 	private static ArrayList<Transaction> transactions = new ArrayList<>();
-
 	private static ArrayList<String> miners_address = new ArrayList<>();
-
 	private static ArrayList<String> coinHolders_address = new ArrayList<>(); // a list keeps track of all coin holders
 
+	private static int confirmedTxions_count = 0;
+	private static int verifiedTxions_count = 0;
+	
 	private final static int MINERS_NUM = 4;
-	private final static int MAX_BLOCKS = 6;
+	private final static int MAX_BLOCKS = 30;
 	private final static int DIFFICULTY = 4;
 	private final static double MINING_REWARDS = 6;
 	private static final int MAX_TXIONS_EACH_PERSON_EACH_EPOCH = 5;
 
 	public static void main(String args[]) {
+		long startTime, endTime, totalTime;
 		Block newBlock = createGenesisBlock();
 		blockchain.add(newBlock);
-
 		miners_address = loadMiners();
 
+		totalTime = 0;
+		
 		for (int i = 0; i < MAX_BLOCKS; i++) {
 			simulateTransactions();
+			startTime = System.currentTimeMillis();
 			newBlock = mine();
+			endTime = System.currentTimeMillis();
+			totalTime += (endTime - startTime);
 			blockchain.add(newBlock);
 			updateCoinHolders(newBlock);
-//			updateTransactions(newBlock);
 		}
 
 		String blockchainJson = new GsonBuilder().setPrettyPrinting().create().toJson(blockchain);
 		System.out.println(blockchainJson);
+		
+		printStats(totalTime);
+	}
 
-//		printChain();
+	private static void printStats(long totalTime) {
+		System.out.println("\nBlock mining rate: " + roundToN((MAX_BLOCKS/(totalTime/1000.0)), 2) + " Blocks/sec");
+
 		System.out.println("\nAll minted coins: " + MAX_BLOCKS * MINING_REWARDS);
 		double coinsOfHolders = 0;
 		for (int i = 0; i < coinHolders_address.size(); i++) {
 			coinsOfHolders += getBalance(coinHolders_address.get(i));
 		}
-		System.out.println("All coins in coinHolders: " + coinsOfHolders + "\n");
+		System.out.println("All coins in coinHolders: " + roundToN(coinsOfHolders, 2) + "\n");
 
 		printCoinHolders();
 
 		System.out.println("\nUnconfirmed transactions:\n" + transactions);
+		
+		System.out.println("\nTransactions confirming rate: " + roundToN((confirmedTxions_count-transactions.size())/(totalTime/1000.0),2) + " Transactions/sec");
+		System.out.println("Transactions verifying rate: " + roundToN((verifiedTxions_count-transactions.size())/(totalTime/1000.0),2) + " Transactions/sec");
 	}
 
 	public static Block createGenesisBlock() {
@@ -105,8 +118,6 @@ public class Beecoin {
 
 		// rewards to the miner will be the first txion
 		nextToBeConfirmed[0] = new Transaction("System", miner_address, MINING_REWARDS, true);
-//		retreiveTransactions(nextToBeConfirmed);
-//		verifyTransactions(nextToBeConfirmed);
 		retreiveVerifiedTxions(nextToBeConfirmed);
 
 		next.setTransactions(nextToBeConfirmed);
@@ -135,10 +146,12 @@ public class Beecoin {
 				nextToBeConfirmed[i] = new Transaction(curr.getSenderID(), curr.getRecepientID(), curr.getAmount(),
 						true);
 				i++;
+				confirmedTxions_count++;
 				balance -= curr.getAmount();
 				tempBalanceMap.put(sender, balance);
 			}
 			transactions.remove(curr);
+			verifiedTxions_count++;
 		}
 	}
 
@@ -251,5 +264,9 @@ public class Beecoin {
 		for (int i = 0; i < blockchain.size(); i++) {
 			System.out.println(blockchain.get(i));
 		}
+	}
+	
+	public static double roundToN(double origin, int n) {
+		return Math.round(origin * Math.pow(10, n)) / ((double)Math.pow(10, n));
 	}
 }
