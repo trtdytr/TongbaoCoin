@@ -3,7 +3,7 @@ import java.util.HashMap;
 
 import com.google.gson.GsonBuilder;
 
-public class Beecoin {
+public class BeeCoinMultiThreaded {
 	private static ArrayList<Block> blockchain = new ArrayList<>(); // The blockchain is implemented as an arraylist of
 																	// Blocks
 	private static ArrayList<Transaction> transactions = new ArrayList<>();
@@ -269,5 +269,24 @@ public class Beecoin {
 	
 	public static double roundToN(double origin, int n) {
 		return Math.round(origin * Math.pow(10, n)) / ((double)Math.pow(10, n));
+	}
+}
+
+
+
+class MinerThread  implements Runnable {
+	
+	private Thread t;
+	private String minerID;
+
+	public MinerThread (String minerID) {
+		this.minerID = minerID;
+		System.out.println("Creating miner: " + minerID);
+	}
+	
+	@Override
+	public void run() {
+		// TODO Auto-generated method stub
+
 	}
 }

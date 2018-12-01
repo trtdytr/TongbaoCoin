@@ -19,7 +19,6 @@ public class Block {
 		this.index = index;
 		this.timestamp = new Date().getTime();
 		this.prev_hash = prev_hash;
-		this.hash = calcHash();
 		this.nounce = nounce;
 		this.difficulty = difficulty;
 		transactions = new Transaction[BLOCK_SIZE];
@@ -43,5 +42,9 @@ public class Block {
 
 	private String calcHash() {
 		return Encryption.sha256(this.index + this.timestamp + this.note + this.transactions + this.prev_hash);
+	}
+	
+	public void setHash() {
+		hash = calcHash();
 	}
 }
