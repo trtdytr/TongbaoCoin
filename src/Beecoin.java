@@ -9,7 +9,7 @@ public class Beecoin {
 	private static ArrayList<Transaction> transactions = new ArrayList<>();
 	private static ArrayList<String> miners_address = new ArrayList<>();
 	private static ArrayList<String> coinHolders_address = new ArrayList<>(); // a list keeps track of all coin holders
-	private static ArrayList<MinerThread> miner_threads = new ArrayList<>(); // a list keeps track of all miner threads
+	private static ArrayList<Miner> miner_threads = new ArrayList<>(); // a list keeps track of all miner threads
 
 	private static int confirmedTxions_count = 0;
 	private static int verifiedTxions_count = 0;
@@ -115,9 +115,9 @@ public class Beecoin {
 	public static Block mine() {
 		Block lastBlock = blockchain.get(blockchain.size() - 1);
 //		String miner_address = getMinerAddr();
-		MinerThread.reset();
+		Miner.reset();
 		for (int i = 0; i < miners_address.size(); i++) {
-			MinerThread mt = new MinerThread(miners_address.get(i), lastBlock.getTimestamp(), DIFFICULTY);
+			Miner mt = new Miner(miners_address.get(i), lastBlock.getTimestamp(), DIFFICULTY);
 			miner_threads.add(mt);
 			mt.start();
 		}
@@ -128,13 +128,14 @@ public class Beecoin {
 				System.out.println("Thread interrupted.");
 			}
 		}
+		System.out.println();
 		miner_threads.removeAll(miner_threads);
 //		String nounce;
 //		nounce = proofOFwork(lastBlock.getTimestamp());
-		Block next = createNextBlock(lastBlock, MinerThread.final_nounce);
+		Block next = createNextBlock(lastBlock, Miner.final_nounce);
 
 		Transaction nextToBeConfirmed[] = new Transaction[Block.BLOCK_SIZE];
-		String miner_address = miners_address.get(MinerThread.claimerID);
+		String miner_address = miners_address.get(Miner.claimerID);
 		// rewards to the miner will be the first txion
 		nextToBeConfirmed[0] = new Transaction("System", miner_address, MINING_REWARDS, true);
 		retreiveVerifiedTxions(nextToBeConfirmed);
@@ -291,7 +292,7 @@ public class Beecoin {
 	}
 }
 
-class MinerThread extends Thread {
+class Miner extends Thread {
 	public static boolean solutionClaimed = false;
 	public static int claimerID = -1;
 	public static int candidate = Integer.MIN_VALUE;
@@ -304,7 +305,7 @@ class MinerThread extends Thread {
 	public int index;
 	public String solution;
 
-	public MinerThread(String minerID, long prevInfo, int difficulty) {
+	public Miner(String minerID, long prevInfo, int difficulty) {
 		super(minerID);
 		index = minerNum;
 		minerNum++;
@@ -313,7 +314,7 @@ class MinerThread extends Thread {
 		this.prevInfo = prevInfo;
 		this.difficulty = difficulty;
 
-		System.out.println("Creating miner thread: " + minerID);
+//		System.out.println("Creating miner thread: " + minerID);
 	}
 
 	public static void reset() {
@@ -321,7 +322,7 @@ class MinerThread extends Thread {
 		claimerID = -1;
 		candidate = Integer.MIN_VALUE;
 		for (int i = 0; i < consensusList.size(); i++) {
-			consensusList.set(i, false);
+			consensusList.removeAll(consensusList);
 		}
 		minerNum = 0;
 		final_nounce = "";
@@ -329,7 +330,7 @@ class MinerThread extends Thread {
 
 	@Override
 	public void run() {
-		System.out.println("Running miner thread: " + this.getName());
+//		System.out.println("Running miner thread: " + this.getName());
 		int nounce = Integer.MIN_VALUE;
 		while (!consensusAchieved()) {
 			while (!solutionClaimed && !numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
@@ -360,7 +361,7 @@ class MinerThread extends Thread {
 			}
 		}
 		final_nounce = "" + candidate + prevInfo;
-		System.out.println("Miner " + this.getName() + " has approved that Miner" + (claimerID + 1)
+		System.out.println("Miner" + (this.index+1) + "(" + this.getName() + ")" + " has approved that Miner" + (claimerID + 1)
 				+ " came up with the correct solution: " + "\"" + final_nounce + "\"");
 
 	}
