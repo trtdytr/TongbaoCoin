@@ -9,10 +9,11 @@ public class Beecoin {
 	private static ArrayList<Transaction> transactions = new ArrayList<>();
 	private static ArrayList<String> miners_address = new ArrayList<>();
 	private static ArrayList<String> coinHolders_address = new ArrayList<>(); // a list keeps track of all coin holders
+	private static ArrayList<MinerThread> miner_threads = new ArrayList<>(); // a list keeps track of all miner threads
 
 	private static int confirmedTxions_count = 0;
 	private static int verifiedTxions_count = 0;
-	
+
 	private final static int MINERS_NUM = 4;
 	private final static int MAX_BLOCKS = 10;
 	private final static int DIFFICULTY = 4;
@@ -26,7 +27,7 @@ public class Beecoin {
 		miners_address = loadMiners();
 
 		totalTime = 0;
-		
+
 		for (int i = 0; i < MAX_BLOCKS; i++) {
 			simulateTransactions();
 			startTime = System.currentTimeMillis();
@@ -39,12 +40,12 @@ public class Beecoin {
 
 		String blockchainJson = new GsonBuilder().setPrettyPrinting().create().toJson(blockchain);
 		System.out.println(blockchainJson);
-		
+
 		printStats(totalTime);
 	}
 
 	private static void printStats(long totalTime) {
-		System.out.println("\nBlock mining rate: " + roundToN((MAX_BLOCKS/(totalTime/1000.0)), 2) + " Blocks/sec");
+		System.out.println("\nBlock mining rate: " + roundToN((MAX_BLOCKS / (totalTime / 1000.0)), 2) + " Blocks/sec");
 
 		System.out.println("\nAll minted coins: " + MAX_BLOCKS * MINING_REWARDS);
 		double coinsOfHolders = 0;
@@ -56,9 +57,13 @@ public class Beecoin {
 		printCoinHolders();
 
 		System.out.println("\nUnconfirmed transactions:\n" + transactions);
-		
-		System.out.println("\nTransactions confirming rate: " + roundToN((confirmedTxions_count-transactions.size())/(totalTime/1000.0),2) + " Transactions/sec");
-		System.out.println("Transactions verifying rate: " + roundToN((verifiedTxions_count-transactions.size())/(totalTime/1000.0),2) + " Transactions/sec");
+
+		System.out.println("\nTransactions confirming rate: "
+				+ roundToN((confirmedTxions_count - transactions.size()) / (totalTime / 1000.0), 2)
+				+ " Transactions/sec");
+		System.out.println("Transactions verifying rate: "
+				+ roundToN((verifiedTxions_count - transactions.size()) / (totalTime / 1000.0), 2)
+				+ " Transactions/sec");
 	}
 
 	public static Block createGenesisBlock() {
@@ -109,13 +114,27 @@ public class Beecoin {
 
 	public static Block mine() {
 		Block lastBlock = blockchain.get(blockchain.size() - 1);
-		String miner_address = getMinerAddr();
-		String nounce;
-		nounce = proofOFwork(lastBlock.getTimestamp());
-		Block next = createNextBlock(lastBlock, nounce);
+//		String miner_address = getMinerAddr();
+		MinerThread.reset();
+		for (int i = 0; i < miners_address.size(); i++) {
+			MinerThread mt = new MinerThread(miners_address.get(i), lastBlock.getTimestamp(), DIFFICULTY);
+			miner_threads.add(mt);
+			mt.start();
+		}
+		for (int i = 0; i < miner_threads.size(); i++) {
+			try {
+				miner_threads.get(i).join();
+			} catch (InterruptedException e) {
+				System.out.println("Thread interrupted.");
+			}
+		}
+		miner_threads.removeAll(miner_threads);
+//		String nounce;
+//		nounce = proofOFwork(lastBlock.getTimestamp());
+		Block next = createNextBlock(lastBlock, MinerThread.final_nounce);
 
 		Transaction nextToBeConfirmed[] = new Transaction[Block.BLOCK_SIZE];
-
+		String miner_address = miners_address.get(MinerThread.claimerID);
 		// rewards to the miner will be the first txion
 		nextToBeConfirmed[0] = new Transaction("System", miner_address, MINING_REWARDS, true);
 		retreiveVerifiedTxions(nextToBeConfirmed);
@@ -266,8 +285,126 @@ public class Beecoin {
 			System.out.println(blockchain.get(i));
 		}
 	}
-	
+
 	public static double roundToN(double origin, int n) {
-		return Math.round(origin * Math.pow(10, n)) / ((double)Math.pow(10, n));
+		return Math.round(origin * Math.pow(10, n)) / ((double) Math.pow(10, n));
+	}
+}
+
+class MinerThread extends Thread {
+	public static boolean solutionClaimed = false;
+	public static int claimerID = -1;
+	public static int candidate = Integer.MIN_VALUE;
+	public static ArrayList<Boolean> consensusList = new ArrayList<Boolean>();
+	public static int minerNum = 0;
+	public static String final_nounce;
+	private int difficulty;
+	private long prevInfo;
+
+	public int index;
+	public String solution;
+
+	public MinerThread(String minerID, long prevInfo, int difficulty) {
+		super(minerID);
+		index = minerNum;
+		minerNum++;
+		consensusList.add(false);
+		solution = "";
+		this.prevInfo = prevInfo;
+		this.difficulty = difficulty;
+
+		System.out.println("Creating miner thread: " + minerID);
+	}
+
+	public static void reset() {
+		solutionClaimed = false;
+		claimerID = -1;
+		candidate = Integer.MIN_VALUE;
+		for (int i = 0; i < consensusList.size(); i++) {
+			consensusList.set(i, false);
+		}
+		minerNum = 0;
+		final_nounce = "";
+	}
+
+	@Override
+	public void run() {
+		System.out.println("Running miner thread: " + this.getName());
+		int nounce = Integer.MIN_VALUE;
+		while (!consensusAchieved()) {
+			while (!solutionClaimed && !numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
+				nounce++;
+				if (nounce == Integer.MAX_VALUE
+						&& !numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
+					prevInfo++;
+					nounce = Integer.MIN_VALUE;
+				}
+			}
+			if (solutionClaimed) {
+				// if someone else claims that a solution is found, verify that
+				if (numLeading0is(difficulty, Encryption.sha256("" + candidate + prevInfo))) {
+					consensusList.set(index, true);
+				} else {
+					// if this candidate fails the verification
+					resetConsensus();
+				}
+				// TODO1: verify the claimed solution
+				// TODO2: report your verification to the public
+			} else if (numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
+				// if this miner finds a solution, report to the public, and wait for
+				// verification
+				solutionClaimed = true;
+				consensusList.set(index, true);
+				candidate = nounce;
+				claimerID = index;
+			}
+		}
+		final_nounce = "" + candidate + prevInfo;
+		System.out.println("Miner " + this.getName() + " has approved that Miner" + (claimerID + 1)
+				+ " came up with the correct solution: " + "\"" + final_nounce + "\"");
+
+	}
+
+	// this method verifies that whether the giving hash contains the given amount
+	// of leading 0's
+	public static boolean numLeading0is(int amount, String hash) {
+		boolean result = true;
+		int count = 0;
+		for (int i = 0; i < hash.length(); i++) {
+			if (hash.charAt(i) == '0') {
+				count++;
+			} else {
+				break;
+			}
+		}
+		if (count != amount) {
+			result = false;
+		}
+
+		return result;
+	}
+
+	private void resetConsensus() {
+		// 1, reset the consensusList to all false
+		for (int i = 0; i < consensusList.size(); i++) {
+			consensusList.set(i, false);
+		}
+		// 2, reset candidate
+		candidate = Integer.MIN_VALUE;
+		// 3, reset solutionClaimed to false
+		solutionClaimed = false;
+		// 4, reset claimerID to -1
+		claimerID = -1;
+	}
+
+	private boolean consensusAchieved() {
+		boolean agree = true;
+		for (int i = 0; i < consensusList.size(); i++) {
+			if (consensusList.get(i) == false) {
+				agree = false;
+				break;
+			}
+		}
+		return agree;
 	}
 }
