@@ -12,10 +12,10 @@ public class Beecoin {
 
 	private static int confirmedTxions_count = 0;
 	private static int verifiedTxions_count = 0;
-	
+
 	private final static int MINERS_NUM = 4;
-	private final static int MAX_BLOCKS = 30;
-	private final static int DIFFICULTY = 4;
+	private final static int MAX_BLOCKS = 10;
+	private final static int DIFFICULTY = 5;
 	private final static double MINING_REWARDS = 6;
 	private static final int MAX_TXIONS_EACH_PERSON_EACH_EPOCH = 5;
 
@@ -26,7 +26,7 @@ public class Beecoin {
 		miners_address = loadMiners();
 
 		totalTime = 0;
-		
+
 		for (int i = 0; i < MAX_BLOCKS; i++) {
 			simulateTransactions();
 			startTime = System.currentTimeMillis();
@@ -39,12 +39,12 @@ public class Beecoin {
 
 		String blockchainJson = new GsonBuilder().setPrettyPrinting().create().toJson(blockchain);
 		System.out.println(blockchainJson);
-		
+
 		printStats(totalTime);
 	}
 
 	private static void printStats(long totalTime) {
-		System.out.println("\nBlock mining rate: " + roundToN((MAX_BLOCKS/(totalTime/1000.0)), 2) + " Blocks/sec");
+		System.out.println("\nBlock mining rate: " + roundToN((MAX_BLOCKS / (totalTime / 1000.0)), 2) + " Blocks/sec");
 
 		System.out.println("\nAll minted coins: " + MAX_BLOCKS * MINING_REWARDS);
 		double coinsOfHolders = 0;
@@ -56,9 +56,13 @@ public class Beecoin {
 		printCoinHolders();
 
 		System.out.println("\nUnconfirmed transactions:\n" + transactions);
-		
-		System.out.println("\nTransactions confirming rate: " + roundToN((confirmedTxions_count-transactions.size())/(totalTime/1000.0),2) + " Transactions/sec");
-		System.out.println("Transactions verifying rate: " + roundToN((verifiedTxions_count-transactions.size())/(totalTime/1000.0),2) + " Transactions/sec");
+
+		System.out.println("\nTransactions confirming rate: "
+				+ roundToN((confirmedTxions_count - transactions.size()) / (totalTime / 1000.0), 2)
+				+ " Transactions/sec");
+		System.out.println("Transactions verifying rate: "
+				+ roundToN((verifiedTxions_count - transactions.size()) / (totalTime / 1000.0), 2)
+				+ " Transactions/sec");
 	}
 
 	public static Block createGenesisBlock() {
@@ -265,8 +269,8 @@ public class Beecoin {
 			System.out.println(blockchain.get(i));
 		}
 	}
-	
+
 	public static double roundToN(double origin, int n) {
-		return Math.round(origin * Math.pow(10, n)) / ((double)Math.pow(10, n));
+		return Math.round(origin * Math.pow(10, n)) / ((double) Math.pow(10, n));
 	}
 }
