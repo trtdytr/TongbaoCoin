@@ -16,7 +16,7 @@ public class Beecoin {
 
 	private final static int MINERS_NUM = 4;
 	private final static int MAX_BLOCKS = 10;
-	private final static int DIFFICULTY = 4;
+	private final static int DIFFICULTY = 5;
 	private final static double MINING_REWARDS = 6;
 	private static final int MAX_TXIONS_EACH_PERSON_EACH_EPOCH = 5;
 
@@ -361,8 +361,8 @@ class Miner extends Thread {
 			}
 		}
 		final_nounce = "" + candidate + prevInfo;
-		System.out.println("Miner" + (this.index+1) + "(" + this.getName() + ")" + " has approved that Miner" + (claimerID + 1)
-				+ " came up with the correct solution: " + "\"" + final_nounce + "\"");
+		System.out.println("Miner" + (this.index + 1) + "(" + this.getName() + ")" + " has approved that Miner"
+				+ (claimerID + 1) + " came up with the correct solution: " + "\"" + final_nounce + "\"");
 
 	}
 
