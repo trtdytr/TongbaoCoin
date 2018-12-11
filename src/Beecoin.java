@@ -15,8 +15,8 @@ public class Beecoin {
 	private static int verifiedTxions_count = 0;
 
 	private final static int MINERS_NUM = 4;
-	private final static int MAX_BLOCKS = 10;
-	private final static int DIFFICULTY = 5;
+	private final static int MAX_BLOCKS = 20;
+	private final static int DIFFICULTY = 4;
 	private final static double MINING_REWARDS = 6;
 	private static final int MAX_TXIONS_EACH_PERSON_EACH_EPOCH = 5;
 
