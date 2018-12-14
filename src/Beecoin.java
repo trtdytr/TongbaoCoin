@@ -1,11 +1,10 @@
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import com.google.gson.GsonBuilder;
-
 public class Beecoin {
-	private static ArrayList<Block> blockchain = new ArrayList<>(); // The blockchain is implemented as an arraylist of
-																	// Blocks
+	private static ArrayList<Block[]> blockchain = new ArrayList<>(); // The blockchain is implemented as an arraylist
+																		// of
+																		// Blocks
 	private static ArrayList<Transaction> transactions = new ArrayList<>();
 	private static ArrayList<String> miners_address = new ArrayList<>();
 	private static ArrayList<String> coinHolders_address = new ArrayList<>(); // a list keeps track of all coin holders
@@ -14,40 +13,42 @@ public class Beecoin {
 	private static int confirmedTxions_count = 0;
 	private static int verifiedTxions_count = 0;
 
-	private final static int MINERS_NUM = 4;
-	private final static int MAX_BLOCKS = 20;
+	private final static int MINERS_NUM = 6;
+	private final static int MAX_ITERATIONS = 20;
 	private final static int DIFFICULTY = 4;
 	private final static double MINING_REWARDS = 6;
 	private static final int MAX_TXIONS_EACH_PERSON_EACH_EPOCH = 5;
+	private static final int MINERS_PER_SHARD = 2; // each shard must be in charged of by at least two Miners
 
 	public static void main(String args[]) {
 		long startTime, endTime, totalTime;
-		Block newBlock = createGenesisBlock();
-		blockchain.add(newBlock);
+		Block newBlockList[] = createGenesisBlock();
+		blockchain.add(newBlockList);
 		miners_address = loadMiners();
 
 		totalTime = 0;
 
-		for (int i = 0; i < MAX_BLOCKS; i++) {
+		for (int i = 0; i < MAX_ITERATIONS; i++) {
 			simulateTransactions();
 			startTime = System.currentTimeMillis();
-			newBlock = mine();
+			newBlockList = mine();
 			endTime = System.currentTimeMillis();
 			totalTime += (endTime - startTime);
-			blockchain.add(newBlock);
-			updateCoinHolders(newBlock);
+			blockchain.add(newBlockList);
+			updateCoinHolders(newBlockList);
 		}
 
-		String blockchainJson = new GsonBuilder().setPrettyPrinting().create().toJson(blockchain);
-		System.out.println(blockchainJson);
+//		String blockchainJson = new GsonBuilder().setPrettyPrinting().create().toJson(blockchain);
+//		System.out.println(blockchainJson);
 
 		printStats(totalTime);
 	}
 
 	private static void printStats(long totalTime) {
-		System.out.println("\nBlock mining rate: " + roundToN((MAX_BLOCKS / (totalTime / 1000.0)), 2) + " Blocks/sec");
+		System.out.println(
+				"\nBlock mining rate: " + roundToN((MAX_ITERATIONS / (totalTime / 1000.0)), 2) + " Blocks/sec");
 
-		System.out.println("\nAll minted coins: " + MAX_BLOCKS * MINING_REWARDS);
+		System.out.println("\nAll minted coins: " + MAX_ITERATIONS * MINING_REWARDS);
 		double coinsOfHolders = 0;
 		for (int i = 0; i < coinHolders_address.size(); i++) {
 			coinsOfHolders += getBalance(coinHolders_address.get(i));
@@ -66,14 +67,30 @@ public class Beecoin {
 				+ " Transactions/sec");
 	}
 
-	public static Block createGenesisBlock() {
-		Block genesisBlock = new Block(0, "0", "no nounce for the first time", DIFFICULTY);
-		genesisBlock.setNote("Everything starts from here!");
-		return genesisBlock;
+	public static Block[] createGenesisBlock() {
+		Block genesisBlockList[] = new Block[1];
+		String genesisPrevHash[] = { "0" };
+		genesisBlockList[0] = new Block(0, genesisPrevHash, "no nounce for the first time", DIFFICULTY);
+		genesisBlockList[0].setNote("Everything starts from here!");
+
+		return genesisBlockList;
 	}
 
-	public static Block createNextBlock(Block prevBlock, String nounce) {
-		return new Block(prevBlock.getIndex() + 1, prevBlock.getHash(), nounce, DIFFICULTY);
+	public static Block[] createNextBlockList(Block prevBlockList[], String nounce[]) {
+		String prevHashList[] = new String[prevBlockList.length];
+
+		for (int i = 0; i < prevHashList.length; i++) {
+			prevHashList[i] = prevBlockList[i].getHash();
+		}
+
+		Block nextBlockList[] = new Block[nounce.length];
+		nextBlockList[0] = new Block(prevBlockList[prevBlockList.length - 1].getIndex(), prevHashList, nounce[0],
+				DIFFICULTY);
+		for (int i = 1; i < nextBlockList.length; i++) {
+			nextBlockList[i] = new Block(nextBlockList[i - 1].getIndex(), prevHashList, nounce[i], DIFFICULTY);
+		}
+
+		return nextBlockList;
 	}
 
 	// this PoW algorithm try to find an integer 'nounce',
@@ -112,15 +129,40 @@ public class Beecoin {
 		return result;
 	}
 
-	public static Block mine() {
-		Block lastBlock = blockchain.get(blockchain.size() - 1);
+	public static Block[] mine() {
+		int neededShardsNum = (int) Math.ceil(((double) transactions.size()) / Block.BLOCK_SIZE);
+		int maxShardsNum = MINERS_NUM / MINERS_PER_SHARD;
+		if (neededShardsNum >= maxShardsNum) {
+			neededShardsNum = maxShardsNum;
+		}
+		if (transactions.size() == 0) {
+			neededShardsNum = 1;
+		}
+		int minersPerShard = (int) Math.ceil(((float) MINERS_NUM) / neededShardsNum);
+		Block newBlockList[];
+
+		Block lastBlockList[] = blockchain.get(blockchain.size() - 1);
+
+		long prevTimestamp = 0;
+		for (int i = 0; i < lastBlockList.length; i++) {
+			prevTimestamp += lastBlockList[i].getTimestamp();
+		}
+		prevTimestamp = (long) Math.round((double) (prevTimestamp) / lastBlockList.length); // for the multi-shards
+																							// version, previous
+		// timestamp = avg of all previous blocks'
+		// timestamp
 //		String miner_address = getMinerAddr();
-		Miner.reset();
+		Miner.prefigureSharding(neededShardsNum, minersPerShard);
 		for (int i = 0; i < miners_address.size(); i++) {
-			Miner mt = new Miner(miners_address.get(i), lastBlock.getTimestamp(), DIFFICULTY);
+			int minerShardID = (int) i / minersPerShard;
+			Miner mt = new Miner(miners_address.get(i), prevTimestamp, DIFFICULTY, minerShardID);
+
 			miner_threads.add(mt);
 			mt.start();
 		}
+		// by now, a number of shardsNum nounce has been found for the same number of
+		// new Blocks
+
 		for (int i = 0; i < miner_threads.size(); i++) {
 			try {
 				miner_threads.get(i).join();
@@ -132,19 +174,30 @@ public class Beecoin {
 		miner_threads.removeAll(miner_threads);
 //		String nounce;
 //		nounce = proofOFwork(lastBlock.getTimestamp());
-		Block next = createNextBlock(lastBlock, Miner.final_nounce);
+		newBlockList = createNextBlockList(lastBlockList, Miner.final_nounce);
 
-		Transaction nextToBeConfirmed[] = new Transaction[Block.BLOCK_SIZE];
-		String miner_address = miners_address.get(Miner.claimerID);
-		// rewards to the miner will be the first txion
-		nextToBeConfirmed[0] = new Transaction("System", miner_address, MINING_REWARDS, true);
-		retreiveVerifiedTxions(nextToBeConfirmed);
+		Transaction nextToBeConfirmed[][] = new Transaction[neededShardsNum][Block.BLOCK_SIZE];
+		String winner_address[] = new String[neededShardsNum];
+		for (int i = 0; i < neededShardsNum; i++) {
+			winner_address[i] = miners_address.get(Miner.claimerID[i]);
+		}
+		// rewards to the miner will be the shard's first txion, every shard's winner
+		// should be rewarded with the same amount of coin,
+		// total number of rewards should remain unchanged
+		for (int i = 0; i < neededShardsNum; i++) {
+			nextToBeConfirmed[i][0] = new Transaction("System", winner_address[i],
+					((float) MINING_REWARDS) / neededShardsNum, true);
+			retreiveVerifiedTxions(nextToBeConfirmed[i]);
+			try {
+				newBlockList[i].setTransactions(nextToBeConfirmed[i]);
+			} catch (Exception e) {
+				e.printStackTrace(System.out);
+			}
+			newBlockList[i].setNote("This is Block #" + newBlockList[i].getIndex());
+			newBlockList[i].setHash();
+		}
 
-		next.setTransactions(nextToBeConfirmed);
-		next.setNote("This is Block #" + next.getIndex());
-		next.setHash();
-
-		return next;
+		return newBlockList;
 	}
 
 	public static void retreiveVerifiedTxions(Transaction[] nextToBeConfirmed) {
@@ -198,13 +251,16 @@ public class Beecoin {
 		}
 	}
 
-	public static void updateCoinHolders(Block block) {
-		for (int i = 0; i < Block.BLOCK_SIZE; i++) {
-			Transaction curr = block.getTransactions()[i];
-			if (curr == null) {
-				break;
-			} else {
-				addCoinHolder(curr.getRecepientID());
+	public static void updateCoinHolders(Block blockList[]) {
+		for (int j = 0; j < blockList.length; j++) {
+			Block block = blockList[j];
+			for (int i = 0; i < Block.BLOCK_SIZE; i++) {
+				Transaction curr = block.getTransactions()[i];
+				if (curr == null) {
+					break;
+				} else {
+					addCoinHolder(curr.getRecepientID());
+				}
 			}
 		}
 	}
@@ -254,19 +310,21 @@ public class Beecoin {
 	public static double getBalance(String addr) {
 		double balance = 0;
 		for (int i = 1; i < blockchain.size(); i++) {
-			Block currB = blockchain.get(i);
-			for (int j = 0; j < Block.BLOCK_SIZE; j++) {
-				Transaction currT = currB.getTransactions()[j];
-				if (currT == null) {
-					break;
-				}
+			for (int k = 0; k < blockchain.get(i).length; k++) {
+				Block currB = blockchain.get(i)[k];
+				for (int j = 0; j < Block.BLOCK_SIZE; j++) {
+					Transaction currT = currB.getTransactions()[j];
+					if (currT == null) {
+						break;
+					}
 
-				if (currT.getRecepientID().equals(addr)) {
-					balance += currT.getAmount();
-				} else if (currT.getSenderID().equals(addr)) {
-					balance -= currT.getAmount();
-				}
+					if (currT.getRecepientID().equals(addr)) {
+						balance += currT.getAmount();
+					} else if (currT.getSenderID().equals(addr)) {
+						balance -= currT.getAmount();
+					}
 
+				}
 			}
 		}
 
@@ -289,123 +347,5 @@ public class Beecoin {
 
 	public static double roundToN(double origin, int n) {
 		return Math.round(origin * Math.pow(10, n)) / ((double) Math.pow(10, n));
-	}
-}
-
-class Miner extends Thread {
-	public static boolean solutionClaimed = false;
-	public static int claimerID = -1;
-	public static int candidate = Integer.MIN_VALUE;
-	public static ArrayList<Boolean> consensusList = new ArrayList<Boolean>();
-	public static int minerNum = 0;
-	public static String final_nounce;
-	private int difficulty;
-	private long prevInfo;
-
-	public int index;
-	public String solution;
-
-	public Miner(String minerID, long prevInfo, int difficulty) {
-		super(minerID);
-		index = minerNum;
-		minerNum++;
-		consensusList.add(false);
-		solution = "";
-		this.prevInfo = prevInfo;
-		this.difficulty = difficulty;
-
-//		System.out.println("Creating miner thread: " + minerID);
-	}
-
-	public static void reset() {
-		solutionClaimed = false;
-		claimerID = -1;
-		candidate = Integer.MIN_VALUE;
-		for (int i = 0; i < consensusList.size(); i++) {
-			consensusList.removeAll(consensusList);
-		}
-		minerNum = 0;
-		final_nounce = "";
-	}
-
-	@Override
-	public void run() {
-//		System.out.println("Running miner thread: " + this.getName());
-		int nounce = Integer.MIN_VALUE;
-		while (!consensusAchieved()) {
-			while (!solutionClaimed && !numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
-				nounce++;
-				if (nounce == Integer.MAX_VALUE
-						&& !numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
-					prevInfo++;
-					nounce = Integer.MIN_VALUE;
-				}
-			}
-			if (solutionClaimed) {
-				// if someone else claims that a solution is found, verify that
-				if (numLeading0is(difficulty, Encryption.sha256("" + candidate + prevInfo))) {
-					consensusList.set(index, true);
-				} else {
-					// if this candidate fails the verification
-					resetConsensus();
-				}
-				// TODO1: verify the claimed solution
-				// TODO2: report your verification to the public
-			} else if (numLeading0is(difficulty, Encryption.sha256("" + nounce + prevInfo))) {
-				// if this miner finds a solution, report to the public, and wait for
-				// verification
-				solutionClaimed = true;
-				consensusList.set(index, true);
-				candidate = nounce;
-				claimerID = index;
-			}
-		}
-		final_nounce = "" + candidate + prevInfo;
-		System.out.println("Miner" + (this.index + 1) + "(" + this.getName() + ")" + " has approved that Miner"
-				+ (claimerID + 1) + " came up with the correct solution: " + "\"" + final_nounce + "\"");
-
-	}
-
-	// this method verifies that whether the giving hash contains the given amount
-	// of leading 0's
-	public static boolean numLeading0is(int amount, String hash) {
-		boolean result = true;
-		int count = 0;
-		for (int i = 0; i < hash.length(); i++) {
-			if (hash.charAt(i) == '0') {
-				count++;
-			} else {
-				break;
-			}
-		}
-		if (count != amount) {
-			result = false;
-		}
-
-		return result;
-	}
-
-	private void resetConsensus() {
-		// 1, reset the consensusList to all false
-		for (int i = 0; i < consensusList.size(); i++) {
-			consensusList.set(i, false);
-		}
-		// 2, reset candidate
-		candidate = Integer.MIN_VALUE;
-		// 3, reset solutionClaimed to false
-		solutionClaimed = false;
-		// 4, reset claimerID to -1
-		claimerID = -1;
-	}
-
-	private boolean consensusAchieved() {
-		boolean agree = true;
-		for (int i = 0; i < consensusList.size(); i++) {
-			if (consensusList.get(i) == false) {
-				agree = false;
-				break;
-			}
-		}
-		return agree;
 	}
 }
