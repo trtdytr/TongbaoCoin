@@ -177,6 +177,8 @@ public class Beecoin {
 		newBlockList = createNextBlockList(lastBlockList, Miner.final_nounce);
 
 		Transaction nextToBeConfirmed[][] = new Transaction[neededShardsNum][Block.BLOCK_SIZE];
+		Transaction txionsOfAllShards[] = new Transaction[neededShardsNum * (Block.BLOCK_SIZE - 1)];
+		retreiveVerifiedTxions(txionsOfAllShards);
 		String winner_address[] = new String[neededShardsNum];
 		for (int i = 0; i < neededShardsNum; i++) {
 			winner_address[i] = miners_address.get(Miner.claimerID[i]);
@@ -187,12 +189,11 @@ public class Beecoin {
 		for (int i = 0; i < neededShardsNum; i++) {
 			nextToBeConfirmed[i][0] = new Transaction("System", winner_address[i],
 					((float) MINING_REWARDS) / neededShardsNum, true);
-			retreiveVerifiedTxions(nextToBeConfirmed[i]);
-			try {
-				newBlockList[i].setTransactions(nextToBeConfirmed[i]);
-			} catch (Exception e) {
-				e.printStackTrace(System.out);
+//			retreiveVerifiedTxions(nextToBeConfirmed[i]);
+			for (int j = 1; j < Block.BLOCK_SIZE; j++) {
+				nextToBeConfirmed[i][j] = txionsOfAllShards[i * (Block.BLOCK_SIZE - 1) + (j - 1)];
 			}
+			newBlockList[i].setTransactions(nextToBeConfirmed[i]);
 			newBlockList[i].setNote("This is Block #" + newBlockList[i].getIndex());
 			newBlockList[i].setHash();
 		}
@@ -202,7 +203,7 @@ public class Beecoin {
 
 	public static void retreiveVerifiedTxions(Transaction[] nextToBeConfirmed) {
 		HashMap<String, Double> tempBalanceMap = new HashMap<String, Double>();
-		int i = 1;
+		int i = 0;
 		while (nextToBeConfirmed[nextToBeConfirmed.length - 1] == null && !transactions.isEmpty()) {
 			Transaction curr = transactions.get(0);
 			String sender = curr.getSenderID();
