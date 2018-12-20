@@ -8,14 +8,14 @@ public class Block {
 	private long timestamp;
 	private String note;
 	private Transaction transactions[];
-	private String prev_hash;
+	private String prev_hash[];
 	private String hash;
 	private int difficulty;
 	private String nounce;
 
 	public static final int BLOCK_SIZE = 20;
 
-	public Block(int index, String prev_hash, String nounce, int difficulty) {
+	public Block(int index, String prev_hash[], String nounce, int difficulty) {
 		this.index = index;
 		this.timestamp = new Date().getTime();
 		this.prev_hash = prev_hash;
@@ -43,7 +43,7 @@ public class Block {
 	private String calcHash() {
 		return Encryption.sha256(this.index + this.timestamp + this.note + this.transactions + this.prev_hash);
 	}
-	
+
 	public void setHash() {
 		hash = calcHash();
 	}

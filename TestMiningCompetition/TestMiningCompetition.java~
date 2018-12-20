@@ -2,6 +2,7 @@ import java.util.ArrayList;
 
 public class TestMiningCompetition {
   private final static int MINER_NUM = 4;
+  private static String nounce; 
   
   public static void main(String[] args) {
     ArrayList<String> miners = generateMiners(MINER_NUM);
@@ -25,6 +26,7 @@ public class TestMiningCompetition {
 class MinerThread implements Runnable{
   private Thread t;
   private String minerID;
+//  public String nounce;
   
   public MinerThread(String minerID) {
     this.minerID = minerID;
@@ -34,6 +36,10 @@ class MinerThread implements Runnable{
   @Override
   public void run() {
     System.out.println("Running miner thread: " + minerID);
+    
+  }
+  
+  private void compute() {
     
   }
   
