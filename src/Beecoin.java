@@ -14,7 +14,7 @@ public class Beecoin {
 	private static int verifiedTxions_count = 0;
 
 	private final static int MINERS_NUM = 6;
-	private final static int MAX_ITERATIONS = 20;
+	private final static int MAX_ITERATIONS = 35;
 	private final static int DIFFICULTY = 4;
 	private final static double MINING_REWARDS = 6;
 	private static final int MAX_TXIONS_EACH_PERSON_EACH_EPOCH = 5;
@@ -57,7 +57,7 @@ public class Beecoin {
 
 		printCoinHolders();
 
-		System.out.println("\nUnconfirmed transactions:\n" + transactions);
+		System.out.println("\nTotally " + transactions.size() + " unconfirmed transactions:\n" + transactions);
 
 		System.out.println("\nTransactions confirming rate: "
 				+ roundToN((confirmedTxions_count - transactions.size()) / (totalTime / 1000.0), 2)
